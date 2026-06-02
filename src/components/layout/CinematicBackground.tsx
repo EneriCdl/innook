@@ -1,10 +1,10 @@
 /**
  * CinematicBackground - 电影级背景
  *
- * 修复：添加加载失败的 CSS 渐变备用方案
+ * 修复：超时逻辑 bug，使用 ref 跟踪加载状态
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '../../stores/appStore'
 import { SCENES } from '../../config/scenes'
@@ -21,28 +21,37 @@ export function CinematicBackground() {
   const { sceneIndex, mode } = useAppStore()
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(false)
+  const loadedRef = useRef(false)
   const scene = SCENES[sceneIndex]
 
   useEffect(() => {
     setLoaded(false)
     setError(false)
+    loadedRef.current = false
 
     const img = new Image()
-    img.onload = () => setLoaded(true)
+
+    img.onload = () => {
+      loadedRef.current = true
+      setLoaded(true)
+    }
+
     img.onerror = () => {
       console.warn('背景图加载失败，使用备用渐变')
       setError(true)
-      setLoaded(true) // 标记为已加载（使用备用方案）
+      setLoaded(true)
     }
+
     img.src = scene.image
 
-    // 超时处理
+    // 超时处理：使用 ref 检查是否已加载
     const timeout = setTimeout(() => {
-      if (!loaded) {
+      if (!loadedRef.current) {
+        console.warn('背景图加载超时')
         setError(true)
         setLoaded(true)
       }
-    }, 5000)
+    }, 8000) // 增加到 8 秒
 
     return () => clearTimeout(timeout)
   }, [scene.image])
@@ -61,16 +70,15 @@ export function CinematicBackground() {
           <motion.div
             key={sceneIndex}
             className="absolute inset-0"
-            initial={{ opacity: 0, scale: 1.05 }}
-            animate={{ opacity: loaded ? 1 : 0, scale: 1 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: loaded ? 1 : 0 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 1.2, ease: [0.4, 0, 0.2, 1] }}
+            transition={{ duration: 0.8 }}
           >
             <img
               src={scene.image}
               alt=""
               className="w-full h-full object-cover"
-              loading="eager"
             />
           </motion.div>
         </AnimatePresence>
