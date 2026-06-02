@@ -27,8 +27,8 @@ export const SCENES: Scene[] = [
   },
   {
     id: 'night-window',
-    name: '夜窗静读',
-    description: '夜色、台灯、专注',
-    image: 'https://picsum.photos/id/28/1920/1080',
+    name: '图书馆',
+    description: '书架、灯光、安静',
+    image: 'https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=1920&q=80',
   },
 ]

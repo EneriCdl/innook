@@ -1,23 +1,42 @@
 /**
  * useAudioManager - 音频管理
  *
- * 使用 Web Audio API 生成白噪音，无需外部音频文件
+ * 使用 Web Audio API 生成白噪音
+ * 修复：更可靠的初始化和播放逻辑
  */
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 import { useAudioStore } from '../stores/audioStore'
 import type { SoundType } from '../types'
 
-// 音频节点类型
-interface AudioNodes {
-  source: AudioBufferSourceNode
-  gain: GainNode
+// 全局音频上下文（避免重复创建）
+let globalCtx: AudioContext | null = null
+
+// 噪音缓冲区缓存
+const bufferCache = new Map<SoundType, AudioBuffer>()
+
+// 活跃的音频节点
+const activeNodes = new Map<SoundType, { source: AudioBufferSourceNode; gain: GainNode }>()
+
+// 获取或创建音频上下文
+function getAudioContext(): AudioContext {
+  if (!globalCtx || globalCtx.state === 'closed') {
+    globalCtx = new AudioContext()
+  }
+  if (globalCtx.state === 'suspended') {
+    globalCtx.resume()
+  }
+  return globalCtx
 }
 
-// 生成不同类型的噪音缓冲区
+// 生成噪音缓冲区
 function createNoiseBuffer(ctx: AudioContext, type: SoundType): AudioBuffer {
+  if (bufferCache.has(type)) {
+    return bufferCache.get(type)!
+  }
+
   const sampleRate = ctx.sampleRate
-  const duration = 2 // 2秒循环
+  const duration = 2
   const bufferSize = sampleRate * duration
   const buffer = ctx.createBuffer(2, bufferSize, sampleRate)
 
@@ -26,177 +45,138 @@ function createNoiseBuffer(ctx: AudioContext, type: SoundType): AudioBuffer {
 
     switch (type) {
       case 'fire':
-        // 篝火：低频隆隆声 + 随机噼啪声
         for (let i = 0; i < bufferSize; i++) {
           const t = i / sampleRate
-          const rumble = Math.sin(t * 40 + Math.random() * 0.5) * 0.3
-          const crackle = Math.random() > 0.999 ? Math.random() * 0.8 : 0
-          const noise = (Math.random() * 2 - 1) * 0.15
+          const rumble = Math.sin(t * 30 + Math.random()) * 0.2
+          const crackle = Math.random() > 0.998 ? Math.random() * 0.6 : 0
+          const noise = (Math.random() * 2 - 1) * 0.1
           data[i] = rumble + crackle + noise
         }
         break
 
       case 'rain':
-        // 雨声：粉红噪音
-        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0
         for (let i = 0; i < bufferSize; i++) {
-          const white = Math.random() * 2 - 1
-          b0 = 0.99886 * b0 + white * 0.0555179
-          b1 = 0.99332 * b1 + white * 0.0750759
-          b2 = 0.96900 * b2 + white * 0.1538520
-          b3 = 0.86650 * b3 + white * 0.3104856
-          b4 = 0.55000 * b4 + white * 0.5329522
-          b5 = -0.7616 * b5 - white * 0.0168980
-          data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11
-          b6 = white * 0.115926
+          data[i] = (Math.random() * 2 - 1) * 0.25
+        }
+        // 简单低通滤波
+        for (let i = 1; i < bufferSize; i++) {
+          data[i] = data[i] * 0.3 + data[i - 1] * 0.7
         }
         break
 
       case 'forest':
-        // 森林：褐噪音 + 鸟鸣模拟
-        let lastOut = 0
+        let lastVal = 0
         for (let i = 0; i < bufferSize; i++) {
           const white = Math.random() * 2 - 1
-          lastOut = (lastOut + (0.02 * white)) / 1.02
-          data[i] = lastOut * 3.5
-          // 偶尔添加高频鸟鸣
-          if (Math.random() > 0.9998) {
-            const chirpLen = Math.floor(sampleRate * 0.1)
-            for (let j = 0; j < chirpLen && i + j < bufferSize; j++) {
-              const t = j / sampleRate
-              data[i + j] += Math.sin(t * 2000 * Math.PI) * 0.3 * (1 - t * 10)
-            }
-          }
+          lastVal = (lastVal + 0.02 * white) / 1.02
+          data[i] = lastVal * 4
         }
         break
 
       case 'ocean':
-        // 海浪：调制白噪音
         for (let i = 0; i < bufferSize; i++) {
           const t = i / sampleRate
-          const wave = Math.sin(t * 0.5) * 0.5 + 0.5 // 缓慢波动
-          const noise = (Math.random() * 2 - 1)
-          data[i] = noise * wave * 0.5
+          const wave = (Math.sin(t * 0.7) + 1) / 2
+          data[i] = (Math.random() * 2 - 1) * wave * 0.3
         }
         break
 
       default:
-        // 默认白噪音
         for (let i = 0; i < bufferSize; i++) {
-          data[i] = (Math.random() * 2 - 1) * 0.3
+          data[i] = (Math.random() * 2 - 1) * 0.2
         }
     }
   }
 
+  bufferCache.set(type, buffer)
   return buffer
+}
+
+// 播放噪音
+function startNoise(type: SoundType, volume: number) {
+  if (activeNodes.has(type)) {
+    // 已在播放，只调整音量
+    const nodes = activeNodes.get(type)!
+    nodes.gain.gain.setValueAtTime(volume, getAudioContext().currentTime)
+    return
+  }
+
+  const ctx = getAudioContext()
+  const buffer = createNoiseBuffer(ctx, type)
+
+  const source = ctx.createBufferSource()
+  source.buffer = buffer
+  source.loop = true
+
+  const gain = ctx.createGain()
+  gain.gain.setValueAtTime(0, ctx.currentTime)
+  gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.2)
+
+  source.connect(gain)
+  gain.connect(ctx.destination)
+  source.start()
+
+  activeNodes.set(type, { source, gain })
+}
+
+// 停止噪音
+function stopNoise(type: SoundType) {
+  const nodes = activeNodes.get(type)
+  if (!nodes) return
+
+  const ctx = getAudioContext()
+  nodes.gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3)
+
+  setTimeout(() => {
+    try {
+      nodes.source.stop()
+      nodes.source.disconnect()
+      nodes.gain.disconnect()
+    } catch {}
+    activeNodes.delete(type)
+  }, 350)
 }
 
 export function useAudioManager() {
   const { tracks, muted, masterVolume } = useAudioStore()
-  const ctxRef = useRef<AudioContext | null>(null)
-  const nodesRef = useRef<Map<SoundType, AudioNodes>>(new Map())
-  const buffersRef = useRef<Map<SoundType, AudioBuffer>>(new Map())
-  const initializedRef = useRef(false)
+  const initedRef = useRef(false)
 
-  // 初始化音频上下文
-  const initAudio = useCallback(() => {
-    if (initializedRef.current) return
-    initializedRef.current = true
-
-    try {
-      const ctx = new AudioContext()
-      ctxRef.current = ctx
-
-      // 生成所有噪音缓冲区
-      const soundTypes: SoundType[] = ['fire', 'rain', 'forest', 'ocean']
-      soundTypes.forEach((type) => {
-        const buffer = createNoiseBuffer(ctx, type)
-        buffersRef.current.set(type, buffer)
-      })
-
-      console.log('✅ 音频系统初始化完成')
-    } catch (err) {
-      console.error('音频初始化失败:', err)
-    }
-  }, [])
-
-  // 用户交互后初始化
+  // 初始化（用户交互后）
   useEffect(() => {
     const unlock = () => {
-      initAudio()
+      if (!initedRef.current) {
+        getAudioContext()
+        initedRef.current = true
+        console.log('✅ 音频已解锁')
+      }
       document.removeEventListener('click', unlock)
       document.removeEventListener('touchstart', unlock)
-      document.removeEventListener('keydown', unlock)
+      document.removeEventListener('pointerdown', unlock)
     }
 
     document.addEventListener('click', unlock)
     document.addEventListener('touchstart', unlock)
-    document.addEventListener('keydown', unlock)
+    document.addEventListener('pointerdown', unlock)
 
     return () => {
       document.removeEventListener('click', unlock)
       document.removeEventListener('touchstart', unlock)
-      document.removeEventListener('keydown', unlock)
+      document.removeEventListener('pointerdown', unlock)
     }
-  }, [initAudio])
+  }, [])
 
-  // 控制音频播放
+  // 控制播放
   useEffect(() => {
-    const ctx = ctxRef.current
-    if (!ctx) return
-
-    // 恢复 AudioContext（如果被暂停）
-    if (ctx.state === 'suspended') {
-      ctx.resume()
-    }
+    if (!initedRef.current) return
 
     Object.entries(tracks).forEach(([id, state]) => {
       const type = id as SoundType
-      const targetVolume = muted ? 0 : state.volume * masterVolume
+      const vol = muted ? 0 : state.volume * masterVolume
 
-      if (state.active && targetVolume > 0) {
-        // 需要播放
-        if (!nodesRef.current.has(type)) {
-          // 创建新的播放节点
-          const buffer = buffersRef.current.get(type)
-          if (!buffer) return
-
-          const source = ctx.createBufferSource()
-          source.buffer = buffer
-          source.loop = true
-
-          const gain = ctx.createGain()
-          gain.gain.value = 0
-
-          source.connect(gain)
-          gain.connect(ctx.destination)
-          source.start()
-
-          nodesRef.current.set(type, { source, gain })
-        }
-
-        // 设置音量
-        const nodes = nodesRef.current.get(type)
-        if (nodes) {
-          nodes.gain.gain.linearRampToValueAtTime(
-            targetVolume,
-            ctx.currentTime + 0.2
-          )
-        }
+      if (state.active && vol > 0.01) {
+        startNoise(type, vol)
       } else {
-        // 需要停止
-        const nodes = nodesRef.current.get(type)
-        if (nodes) {
-          nodes.gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3)
-          setTimeout(() => {
-            try {
-              nodes.source.stop()
-              nodes.source.disconnect()
-              nodes.gain.disconnect()
-            } catch {}
-            nodesRef.current.delete(type)
-          }, 350)
-        }
+        stopNoise(type)
       }
     })
   }, [tracks, muted, masterVolume])
@@ -204,22 +184,9 @@ export function useAudioManager() {
   // 清理
   useEffect(() => {
     return () => {
-      nodesRef.current.forEach((nodes) => {
-        try {
-          nodes.source.stop()
-          nodes.source.disconnect()
-          nodes.gain.disconnect()
-        } catch {}
-      })
-      nodesRef.current.clear()
-
-      if (ctxRef.current) {
-        ctxRef.current.close()
-      }
+      activeNodes.forEach((_, type) => stopNoise(type))
     }
   }, [])
-
-  return { ready: initializedRef.current }
 }
 
 export default useAudioManager
