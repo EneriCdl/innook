@@ -5,9 +5,8 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Pause, Play, Square } from 'lucide-react'
-import { useAppStore } from '../../stores/appStore'
 import { useTimerStore } from '../../stores/timerStore'
 import { useHonestyCheck } from '../../hooks/useHonestyCheck'
 import { getRandomQuote } from '../../config/quotes'
@@ -20,10 +19,8 @@ const formatTime = (seconds: number): string => {
 }
 
 export function FocusMode() {
-  const { setMode } = useAppStore()
   const { remainingSeconds, status, tick, pause, resume, complete } = useTimerStore()
   const [quote] = useState(getRandomQuote())
-  const [showControls, setShowControls] = useState(false)
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // 在这里创建唯一的 honestyCheck 实例

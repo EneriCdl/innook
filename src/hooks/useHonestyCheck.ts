@@ -16,7 +16,7 @@ type HonestyState = 'idle' | 'asking' | 'noting' | 'discarding'
 export function useHonestyCheck() {
   const [state, setState] = useState<HonestyState>('idle')
   const [content, setContent] = useState('')
-  const { saveSession, discardSession, reset, status } = useTimerStore()
+  const { saveSession, reset, status } = useTimerStore()
   const { setMode } = useAppStore()
   const triggeredRef = useRef(false)
 

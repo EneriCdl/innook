@@ -9,7 +9,7 @@
  */
 
 import { motion } from 'framer-motion'
-import { Play, Timer, ArrowUp } from 'lucide-react'
+import { Play } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useTimerStore } from '../../stores/timerStore'
 import { SceneSelector } from './SceneSelector'
