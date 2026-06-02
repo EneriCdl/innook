@@ -45,12 +45,33 @@ function createNoiseBuffer(ctx: AudioContext, type: SoundType): AudioBuffer {
 
     switch (type) {
       case 'fire':
+        // 篝火：低频隆隆声 + 随机噼啪声
         for (let i = 0; i < bufferSize; i++) {
           const t = i / sampleRate
-          const rumble = Math.sin(t * 30 + Math.random()) * 0.2
-          const crackle = Math.random() > 0.998 ? Math.random() * 0.6 : 0
-          const noise = (Math.random() * 2 - 1) * 0.1
-          data[i] = rumble + crackle + noise
+          // 低频隆隆声
+          const rumble = Math.sin(t * 25 + Math.sin(t * 7) * 2) * 0.15
+          // 持续的燃烧背景噪音
+          const burnNoise = (Math.random() * 2 - 1) * 0.08
+          // 随机噼啪声（短促高频）
+          let crackle = 0
+          if (Math.random() > 0.997) {
+            // 噼啪声：快速衰减的高频脉冲
+            const crackLen = Math.floor(sampleRate * (0.02 + Math.random() * 0.05))
+            for (let j = 0; j < crackLen && (i + j) < bufferSize; j++) {
+              const env = Math.exp(-j / (sampleRate * 0.008)) // 快速衰减
+              const freq = 1500 + Math.random() * 3000 // 高频
+              data[i + j] += Math.sin(j / sampleRate * freq * Math.PI * 2) * env * (0.3 + Math.random() * 0.4)
+            }
+          }
+          // 偶尔的大噼啪
+          if (Math.random() > 0.9995) {
+            const crackLen = Math.floor(sampleRate * (0.05 + Math.random() * 0.1))
+            for (let j = 0; j < crackLen && (i + j) < bufferSize; j++) {
+              const env = Math.exp(-j / (sampleRate * 0.015))
+              data[i + j] += (Math.random() * 2 - 1) * env * (0.4 + Math.random() * 0.3)
+            }
+          }
+          data[i] = rumble + burnNoise + crackle
         }
         break
 
@@ -65,11 +86,51 @@ function createNoiseBuffer(ctx: AudioContext, type: SoundType): AudioBuffer {
         break
 
       case 'forest':
+        // 森林：褐噪音背景 + 小鸟叫声
         let lastVal = 0
         for (let i = 0; i < bufferSize; i++) {
           const white = Math.random() * 2 - 1
           lastVal = (lastVal + 0.02 * white) / 1.02
-          data[i] = lastVal * 4
+          data[i] = lastVal * 3 // 柔和的背景噪音
+
+          // 偶尔的小鸟叫声
+          if (Math.random() > 0.99985) {
+            // 生成一段鸟鸣
+            const chirpDur = 0.08 + Math.random() * 0.12 // 80-200ms
+            const chirpLen = Math.floor(sampleRate * chirpDur)
+            const chirpFreq = 2500 + Math.random() * 2000 // 2.5-4.5kHz
+            const chirpCount = 1 + Math.floor(Math.random() * 3) // 1-3个音节
+
+            for (let j = 0; j < chirpLen * chirpCount && (i + j) < bufferSize; j++) {
+              const syllableIdx = Math.floor(j / chirpLen)
+              const jInSyllable = j - syllableIdx * chirpLen
+              const tSyl = jInSyllable / sampleRate
+
+              // 包络：快速起音，缓慢衰减
+              const env = Math.exp(-tSyl / (chirpDur * 0.3)) * Math.sin(Math.PI * tSyl / chirpDur)
+
+              // 频率微微上扬
+              const freq = chirpFreq * (1 + tSyl * 2)
+
+              // 音节间的小停顿
+              const gap = Math.sin(Math.PI * (jInSyllable / chirpLen))
+
+              data[i + j] += Math.sin(tSyl * freq * Math.PI * 2) * env * gap * 0.2
+            }
+          }
+
+          // 非常偶尔的低沉鸟叫（远处的）
+          if (Math.random() > 0.99998) {
+            const callDur = 0.3 + Math.random() * 0.2
+            const callLen = Math.floor(sampleRate * callDur)
+            const callFreq = 800 + Math.random() * 400
+
+            for (let j = 0; j < callLen && (i + j) < bufferSize; j++) {
+              const t = j / sampleRate
+              const env = Math.exp(-t / (callDur * 0.4)) * Math.sin(Math.PI * t / callDur)
+              data[i + j] += Math.sin(t * callFreq * Math.PI * 2) * env * 0.15
+            }
+          }
         }
         break
 
