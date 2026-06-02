@@ -1,5 +1,7 @@
 /**
  * CinematicBackground - 电影级背景
+ *
+ * 修复：添加加载失败的 CSS 渐变备用方案
  */
 
 import { useEffect, useState } from 'react'
@@ -7,33 +9,72 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '../../stores/appStore'
 import { SCENES } from '../../config/scenes'
 
+// CSS 渐变备用背景
+const FALLBACK_GRADIENTS = [
+  'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)',
+  'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+  'linear-gradient(135deg, #0d1b2a 0%, #1b2838 50%, #2d4059 100%)',
+  'linear-gradient(135deg, #141e30 0%, #243b55 100%)',
+]
+
 export function CinematicBackground() {
   const { sceneIndex, mode } = useAppStore()
   const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState(false)
   const scene = SCENES[sceneIndex]
 
   useEffect(() => {
     setLoaded(false)
+    setError(false)
+
     const img = new Image()
     img.onload = () => setLoaded(true)
+    img.onerror = () => {
+      console.warn('背景图加载失败，使用备用渐变')
+      setError(true)
+      setLoaded(true) // 标记为已加载（使用备用方案）
+    }
     img.src = scene.image
+
+    // 超时处理
+    const timeout = setTimeout(() => {
+      if (!loaded) {
+        setError(true)
+        setLoaded(true)
+      }
+    }, 5000)
+
+    return () => clearTimeout(timeout)
   }, [scene.image])
 
   return (
     <div className="fixed inset-0 z-0">
+      {/* 备用渐变背景（始终显示） */}
+      <div
+        className="absolute inset-0"
+        style={{ background: FALLBACK_GRADIENTS[sceneIndex % FALLBACK_GRADIENTS.length] }}
+      />
+
       {/* 背景图片 */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={sceneIndex}
-          className="absolute inset-0"
-          initial={{ opacity: 0, scale: 1.05 }}
-          animate={{ opacity: loaded ? 1 : 0, scale: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 1.2, ease: [0.4, 0, 0.2, 1] }}
-        >
-          <img src={scene.image} alt="" className="w-full h-full object-cover" />
-        </motion.div>
-      </AnimatePresence>
+      {!error && (
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={sceneIndex}
+            className="absolute inset-0"
+            initial={{ opacity: 0, scale: 1.05 }}
+            animate={{ opacity: loaded ? 1 : 0, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.2, ease: [0.4, 0, 0.2, 1] }}
+          >
+            <img
+              src={scene.image}
+              alt=""
+              className="w-full h-full object-cover"
+              loading="eager"
+            />
+          </motion.div>
+        </AnimatePresence>
+      )}
 
       {/* 遮罩层 */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/50" />
