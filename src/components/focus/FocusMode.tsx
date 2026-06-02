@@ -4,7 +4,7 @@
  * 修复：useHonestyCheck 只在 FocusMode 中创建一次，通过 props 传给 HonestyModal
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Pause, Play, Square } from 'lucide-react'
 import { useTimerStore } from '../../stores/timerStore'
@@ -21,9 +21,6 @@ const formatTime = (seconds: number): string => {
 export function FocusMode() {
   const { remainingSeconds, status, tick, pause, resume, complete } = useTimerStore()
   const [quote] = useState(getRandomQuote())
-  const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // 在这里创建唯一的 honestyCheck 实例
   const honestyCheck = useHonestyCheck()
 
   // 计时器逻辑
@@ -40,23 +37,6 @@ export function FocusMode() {
       honestyCheck.trigger()
     }
   }, [status, honestyCheck.state, honestyCheck.trigger])
-
-  // 鼠标移动显示控制条
-  const handleMouseMove = useCallback(() => {
-    setShowControls(true)
-    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current)
-    controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000)
-  }, [])
-
-  useEffect(() => {
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('touchstart', handleMouseMove)
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('touchstart', handleMouseMove)
-      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current)
-    }
-  }, [handleMouseMove])
 
   // 结束专注
   const handleEnd = useCallback(() => {
