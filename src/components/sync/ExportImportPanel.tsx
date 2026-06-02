@@ -68,9 +68,10 @@ export function ExportImportPanel() {
 
   return (
     <>
-      <div className="flex items-center gap-2">
+      {/* 按钮组 - 玻璃背景板包裹 */}
+      <div className="glass-panel px-3 py-2 flex items-center gap-2.5">
         <motion.button
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 text-white/60 text-xs hover:bg-white/10 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/5 text-white/60 text-xs hover:bg-white/10 transition-colors"
           onClick={exportData}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -81,7 +82,7 @@ export function ExportImportPanel() {
         </motion.button>
 
         <motion.button
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 text-white/60 text-xs hover:bg-white/10 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/5 text-white/60 text-xs hover:bg-white/10 transition-colors"
           onClick={importData}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -92,7 +93,7 @@ export function ExportImportPanel() {
         </motion.button>
 
         <motion.button
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs transition-colors ${
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-colors ${
             copied
               ? 'bg-green-500/20 text-green-400'
               : 'bg-white/5 text-white/60 hover:bg-white/10'
@@ -106,9 +107,8 @@ export function ExportImportPanel() {
           <span className="hidden sm:inline">{copied ? '已复制' : '复制'}</span>
         </motion.button>
 
-        {/* 粘贴导入按钮 */}
         <motion.button
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-600/30 text-violet-300 text-xs hover:bg-violet-600/50 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-600/20 text-violet-300 text-xs hover:bg-violet-600/30 transition-colors"
           onClick={() => setShowPasteModal(true)}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
