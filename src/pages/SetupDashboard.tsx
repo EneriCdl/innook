@@ -30,7 +30,7 @@ export function SetupDashboard() {
   return (
     <div className="relative z-10 min-h-screen flex flex-col">
       {/* 顶部导航栏 */}
-      <header className="flex items-center justify-between px-8 md:px-12 py-5">
+      <header className="flex items-center justify-between px-6 md:px-16 lg:px-20 py-6">
         <ExportImportPanel />
         <CalendarButton />
       </header>
